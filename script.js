@@ -8,6 +8,59 @@
   let motionOff = motionPreference.matches;
   let cleanupTimer;
 
+  const music = $('birthday-music');
+  const musicButton = $('music-button');
+  let musicDisabled = false;
+  let musicPending = false;
+  let musicFailed = false;
+  music.volume = 0.15;
+
+  function updateMusicButton() {
+    const playing = !music.paused && !musicFailed;
+    musicButton.textContent = musicFailed ? '♫ Повторить запуск' : playing ? '♫ Выключить музыку' : '♫ Включить музыку';
+    musicButton.setAttribute('aria-pressed', String(playing));
+    musicButton.setAttribute('aria-label', playing ? 'Выключить музыку' : 'Включить музыку');
+    musicButton.title = playing ? 'Песня играет тихо. Нажмите, чтобы выключить' : 'Нажмите, чтобы включить тихую музыку';
+  }
+  async function startMusic() {
+    if (musicDisabled || musicPending || !music.paused) return;
+    musicPending = true;
+    musicFailed = false;
+    try {
+      // На iPhone громкость HTML-аудио может определяться системной громкостью.
+      music.volume = 0.15;
+      await music.play();
+    } catch (error) {
+      musicFailed = error.name !== 'NotAllowedError' && error.name !== 'AbortError';
+    } finally {
+      musicPending = false;
+      updateMusicButton();
+    }
+  }
+  music.addEventListener('play', updateMusicButton);
+  music.addEventListener('pause', updateMusicButton);
+  music.addEventListener('error', () => { musicFailed = true; updateMusicButton(); });
+  musicButton.addEventListener('click', () => {
+    if (!music.paused || musicPending) {
+      musicDisabled = true;
+      music.pause();
+      updateMusicButton();
+    } else {
+      musicDisabled = false;
+      startMusic();
+    }
+  });
+  function firstInteraction(event) {
+    if (event.target === musicButton || musicButton.contains(event.target)) return;
+    if (!musicDisabled && !musicFailed) startMusic();
+  }
+  document.addEventListener('click', firstInteraction);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') firstInteraction(event);
+  });
+  updateMusicButton();
+  startMusic();
+
   function dayWord(n) {
     const last = n % 10, lastTwo = n % 100;
     if (lastTwo >= 11 && lastTwo <= 14) return 'дней';
